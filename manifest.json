@@ -1,0 +1,20 @@
+{
+  "name": "Özgür Çocuk — Borç & Alacak Takip",
+  "short_name": "Özgür Çocuk",
+  "description": "Borç ve alacak takip uygulaması",
+  "start_url": "./ozgur-cocuk.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "lang": "tr",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
