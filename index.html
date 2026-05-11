@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <meta name="description" content="Özgür Çocuk — Borç ve Alacak Takip Uygulaması" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Özgür Çocuk" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <title>Özgür Çocuk</title>
+
+  <!-- ═══════════════════════════════════════════
+       EXTERNAL LIBRARIES (CDN — offline capable
+       after first load via Service Worker cache)
+  ═══════════════════════════════════════════ -->
+  <!-- React 18 -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <!-- Babel (JSX transform in-browser) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <!-- Dexie.js — IndexedDB ORM -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <!-- SheetJS (Excel export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    // ── Tailwind custom config ──────────────────────────────
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            surface:  { DEFAULT: '#0a0f1e', 2: '#111827', 3: '#1a2235', 4: '#1f2a40' },
+            border:   { DEFAULT: '#1e2d4a', 2: '#2a3f60' },
+            txt:      { primary: '#e2e8f4', secondary: '#7a8fa8', muted: '#3d5166' },
+            emerald:  { DEFAULT: '#10b981', dark: '#064e3b', border: '#065f46' },
+            rose:     { DEFAULT: '#f43f5e', dark: '#4c0519', border: '#881337' },
+            sky:      { DEFAULT: '#38bdf8', dark: '#082f49', border: '#0369a1' },
+            amber:    { DEFAULT: '#fbbf24', dark: '#451a03' },
+            violet:   { DEFAULT: '#8b5cf6', dark: '#2e1065' },
+          },
+          fontFamily: {
+            display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            body:    ['"DM Sans"', 'system-ui', 'sans-serif'],
+            mono:    ['"JetBrains Mono"', 'monospace'],
+          },
+          borderRadius: { xl2: '1.25rem', xl3: '1.75rem' },
+          boxShadow: {
+            glow:     '0 0 24px rgba(56,189,248,.15)',
+            'glow-g': '0 0 24px rgba(16,185,129,.15)',
+            'glow-r': '0 0 24px rgba(244,63,94,.15)',
+            card:     '0 4px 32px rgba(0,0,0,.45)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Base ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      background: #0a0f1e;
+      color: #e2e8f4;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0a0f1e; }
+    ::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 3px; }
+    /* Animations */
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(16px);  } to { opacity:1; transform:translateY(0);   } }
+    @keyframes fadeIn   { from { opacity:0; }                              to { opacity:1;                              } }
+    @keyframes slideUp  { from { transform:translateY(100%);              } to { transform:translateY(0);               } }
+    @keyframes pulse2   { 0%,100% { opacity:1; } 50% { opacity:.5; }                                                    }
+    @keyframes spin     { to { transform:rotate(360deg); }                                                              }
+    @keyframes shimmer  { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
+
+    .anim-fadeup  { animation: fadeUp  .35s ease both; }
+    .anim-fadein  { animation: fadeIn  .25s ease both; }
+    .anim-slideup { animation: slideUp .3s  cubic-bezier(.32,.72,0,1) both; }
+    .spinner      { animation: spin    .8s linear infinite; }
+    .shimmer-bg   {
+      background: linear-gradient(90deg, #1a2235 25%, #1f2a40 50%, #1a2235 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    /* Staggered delays */
+    .delay-1 { animation-delay: .05s; }
+    .delay-2 { animation-delay: .10s; }
+    .delay-3 { animation-delay: .15s; }
+    .delay-4 { animation-delay: .20s; }
+    .delay-5 { animation-delay: .25s; }
+
+    /* Input styling */
+    input, textarea, select {
+      background: #111827;
+      border: 1px solid #1e2d4a;
+      border-radius: .75rem;
+      color: #e2e8f4;
+      font-family: inherit;
+      font-size: 15px;
+      outline: none;
+      width: 100%;
+      padding: 11px 14px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56,189,248,.12);
+    }
+    input::placeholder, textarea::placeholder { color: #3d5166; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
+    textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
+    select option { background: #111827; }
+
+    /* Modal backdrop */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    @media(min-width:640px) {
+      .modal-backdrop { align-items: center; }
+      .modal-sheet { border-radius: 1.25rem !important; border: 1px solid #1e2d4a; max-height: 88vh; }
+    }
+    .modal-sheet {
+      background: #111827;
+      border-radius: 1.25rem 1.25rem 0 0;
+      width: 100%; max-width: 600px;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 24px 20px 32px;
+    }
+
+    /* Image preview */
+    .img-preview {
+      width: 100%; max-height: 220px;
+      object-fit: contain;
+      border-radius: .75rem;
+      border: 1px solid #1e2d4a;
+      cursor: pointer;
+    }
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed #1e2d4a;
+      border-radius: 1rem;
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .upload-zone:hover { border-color: #38bdf8; background: rgba(56,189,248,.04); }
+
+    /* Tab active indicator */
+    .tab-active { color: #38bdf8 !important; }
+    .tab-active svg { color: #38bdf8 !important; }
+
+    /* Type toggle */
+    .type-btn-alacak.selected { background: rgba(16,185,129,.15); border-color: #065f46; color: #10b981; }
+    .type-btn-borc.selected   { background: rgba(244,63,94,.15);  border-color: #881337; color: #f43f5e; }
+
+    /* Notification toast */
+    .toast {
+      position: fixed; top: 68px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 999;
+      padding: 12px 22px;
+      border-radius: .875rem;
+      font-size: 14px; font-weight: 600;
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: 90vw;
+      transition: opacity .3s, transform .3s;
+    }
+    .toast-success { background: rgba(16,185,129,.12); border: 1px solid #065f46; color: #10b981; }
+    .toast-error   { background: rgba(244,63,94,.12);  border: 1px solid #881337; color: #f43f5e; }
+    .toast-info    { background: rgba(56,189,248,.12); border: 1px solid #0369a1; color: #38bdf8; }
+
+    /* Safe area for bottom nav */
+    .safe-bottom { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    .bottom-nav  { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* Desktop hide bottom-nav */
+    @media(min-width:768px) {
+      .mobile-only  { display: none !important; }
+      .desktop-show { display: flex !important; }
+      .safe-bottom  { padding-bottom: 32px; }
+    }
+    .desktop-show { display: none; }
+
+    /* Gallery grid */
+    .gallery-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+    @media(min-width:480px) { .gallery-grid { grid-template-columns: repeat(4,1fr); } }
+    .gallery-thumb { width:100%; aspect-ratio:1; object-fit:cover; border-radius:.625rem; border:1px solid #1e2d4a; cursor:pointer; transition: transform .15s, border-color .2s; }
+    .gallery-thumb:hover { transform: scale(1.05); border-color: #38bdf8; }
+
+    /* Floating action button */
+    .fab {
+      position: fixed; right: 20px; bottom: 84px;
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #38bdf8, #7c3aed);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 24px rgba(56,189,248,.4);
+      cursor: pointer; z-index: 90;
+      transition: transform .2s, box-shadow .2s;
+      border: none;
+    }
+    .fab:hover  { transform: scale(1.08); box-shadow: 0 6px 32px rgba(56,189,248,.55); }
+    .fab:active { transform: scale(.95); }
+    @media(min-width:768px) { .fab { bottom: 28px; right: 28px; } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     REACT APPLICATION — JSX (Babel transpiles in-browser)
+═══════════════════════════════════════════════════════ -->
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ════════════════════════════════════════════════════════
+   MODULE: database.js  — Dexie IndexedDB schema & helpers
+════════════════════════════════════════════════════════ */
+const db = new Dexie('OzgurCocukDB');
+db.version(2).stores({
+  // Primary key: ++id (auto-increment), indexed fields after
+  records: '++id, type, person, date, createdAt',
+  // Gallery images linked to records
+  images:  '++id, recordId, createdAt',
+});
+
+// ── DB Helper functions ────────────────────────────────
+const DB = {
+  // Records
+  async getAllRecords()       { return await db.records.orderBy('createdAt').reverse().toArray(); },
+  async getRecord(id)        { return await db.records.get(id); },
+  async addRecord(data)      { return await db.records.add({ ...data, createdAt: new Date().toISOString() }); },
+  async updateRecord(id, data){ return await db.records.update(id, data); },
+  async deleteRecord(id)     {
+    await db.records.delete(id);
+    // Cascade: delete linked images
+    await db.images.where('recordId').equals(id).delete();
+  },
+
+  // Images
+  async getImagesForRecord(recordId) { return await db.images.where('recordId').equals(recordId).toArray(); },
+  async getAllImages()                { return await db.images.orderBy('createdAt').reverse().toArray(); },
+  async addImage(recordId, dataUrl, name) {
+    return await db.images.add({ recordId, dataUrl, name, createdAt: new Date().toISOString() });
+  },
+  async deleteImage(id)  { return await db.images.delete(id); },
+
+  // Export all as JSON
+  async exportJSON() {
+    const records = await DB.getAllRecords();
+    const images  = await DB.getAllImages();
+    return { records, images, exportedAt: new Date().toISOString(), version: 2 };
+  },
+
+  // Import from JSON backup
+  async importJSON(data) {
+    if (!data.records) throw new Error('Geçersiz yedek dosyası');
+    let added = 0;
+    for (const r of data.records) {
+      const exists = r.id ? await db.records.get(r.id) : null;
+      if (!exists) { const { id, ...rest } = r; await db.records.add(rest); added++; }
+    }
+    if (data.images) {
+      for (const img of data.images) {
+        if (img.recordId) {
+          const existing = await db.images.where('recordId').equals(img.recordId).toArray();
+          if (!existing.length) {
+            const { id, ...rest } = img;
+            await db.images.add(rest);
+          }
+        }
+      }
+    }
+    return added;
+  }
+};
+
+/* ════════════════════════════════════════════════════════
+   MODULE: utils.js  — Formatting & utility helpers
+════════════════════════════════════════════════════════ */
+const fmt = {
+  number: n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0),
+  date:   d => { try { return new Date(d).toLocaleDateString('tr-TR', { day:'2-digit', month:'short', year:'numeric' }); } catch(e) { return '—'; } },
+  initials: name => (name || '?').trim().split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0,2) || '?',
+  uid:    () => Date.now().toString(36) + Math.random().toString(36).slice(2),
+  today:  () => new Date().toISOString().split('T')[0],
+};
+
+function esc(s) {
+  const div = document.createElement('div');
+  div.textContent = String(s);
+  return div.innerHTML;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = () => rej(new Error('Dosya okunamadı'));
+    r.readAsDataURL(file);
+  });
+}
+
+function downloadBlob(blob, name) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ════════════════════════════════════════════════════════
+   MODULE: useToast — global notification hook
+════════════════════════════════════════════════════════ */
+function useToast() {
+  const [toast, setToast] = useState(null);
+  const timerRef = useRef(null);
+  const show = useCallback((msg, type = 'success', ms = 3000) => {
+    clearTimeout(timerRef.current);
+    setToast({ msg, type });
+    timerRef.current = setTimeout(() => setToast(null), ms);
+  }, []);
+  return { toast, show };
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: Toast — notification banner
+════════════════════════════════════════════════════════ */
+function Toast({ toast }) {
+  if (!toast) return null;
+  const cls = { success: 'toast-success', error: 'toast-error', info: 'toast-info' }[toast.type] || 'toast-info';
+  return <div className={`toast ${cls} anim-fadein`}>{toast.msg}</div>;
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: Modal — bottom sheet / center dialog
+════════════════════════════════════════════════════════ */
+function Modal({ open, onClose, title, children }) {
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    if (open) window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="modal-backdrop anim-fadein" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet anim-slideup">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold text-txt-primary font-display">{title}</h2>
+          <button onClick={onClose}
+            className="w-9 h-9 rounded-xl bg-surface-3 border border-border flex items-center justify-center text-txt-secondary hover:text-txt-primary transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: TypeSelector — Alacak / Borç toggle
+════════════════════════════════════════════════════════ */
+function TypeSelector({ value, onChange }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 mb-5">
+      {[
+        { v: 'alacak', label: '💚 Alacak', cls: 'type-btn-alacak' },
+        { v: 'borc',   label: '❤️ Borç',   cls: 'type-btn-borc'   },
+      ].map(({ v, label, cls }) => (
+        <button key={v} type="button"
+          onClick={() => onChange(v)}
+          className={`${cls} ${value === v ? 'selected' : ''} py-3 rounded-xl border border-border-2 text-txt-secondary font-semibold text-sm transition-all`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: ImageUploader — file picker + preview
+════════════════════════════════════════════════════════ */
+function ImageUploader({ onImageSelected, currentPreview, onRemove }) {
+  const inputRef = useRef();
+  const handleFile = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    const dataUrl = await readFileAsDataURL(file);
+    onImageSelected(dataUrl, file.name);
+    e.target.value = '';
+  };
+
+  return (
+    <div>
+      {currentPreview ? (
+        <div className="relative">
+          <img src={currentPreview} alt="Görsel önizleme" className="img-preview mb-2" />
+          <button type="button" onClick={onRemove}
+            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-rose-dark border border-rose-border text-rose text-sm font-bold flex items-center justify-center">
+            ✕
+          </button>
+          <p className="text-xs text-txt-muted text-center">Görsele tıklayarak tam ekran görüntüle</p>
+        </div>
+      ) : (
+        <div className="upload-zone" onClick={() => inputRef.current?.click()}>
+          <svg className="w-10 h-10 text-txt-muted mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p className="text-txt-secondary font-semibold mb-1">Görsel Ekle</p>
+          <p className="text-txt-muted text-sm">Fiş, el yazısı veya belge fotoğrafı</p>
+          <p className="text-txt-muted text-xs mt-1">JPG, PNG, WEBP, HEIC</p>
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" style={{display:'none'}} />
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: RecordForm — add / edit transaction form
+════════════════════════════════════════════════════════ */
+function RecordForm({ initial, onSave, onCancel, showToast }) {
+  const [form, setForm] = useState({
+    type:   initial?.type   || 'alacak',
+    person: initial?.person || '',
+    amount: initial?.amount || '',
+    date:   initial?.date   || fmt.today(),
+    desc:   initial?.desc   || '',
+    note:   initial?.note   || '',
+  });
+  const [imagePreview, setImagePreview] = useState(initial?.imagePending || null);
+  const [imageName, setImageName]       = useState('');
+  const [saving, setSaving]             = useState(false);
+
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async () => {
+    if (!form.person.trim()) { showToast('⚠️ Kişi adı gerekli!', 'error'); return; }
+    const amount = parseFloat(String(form.amount).replace(',', '.'));
+    if (!amount || amount <= 0 || isNaN(amount)) { showToast('⚠️ Geçerli bir tutar girin!', 'error'); return; }
+
+    setSaving(true);
+    try {
+      const recordId = await onSave({ ...form, amount }, imagePreview, imageName);
+      showToast(form.type === 'alacak' ? '💚 Alacak kaydedildi' : '❤️ Borç kaydedildi');
+    } catch(e) {
+      showToast('Kayıt hatası: ' + e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Type selector */}
+      <TypeSelector value={form.type} onChange={v => setForm(f => ({...f, type: v}))} />
+
+      {/* Person */}
+      <div>
+        <label className="block text-xs font-semibold text-txt-secondary mb-1.5 uppercase tracking-wide">Kişi Adı *</label>
+        <input value={form.person} onChange={set('person')} placeholder="Ad Soyad" />
+      </div>
+
+      {/* Amount — ALWAYS manual, no OCR */}
+      <div>
+        <label className="block text-xs font-semibold text-txt-secondary mb-1.5 uppercase tracking-wide">Tutar (₺) *</label>
+        <input type="number" value={form.amount} onChange={set('amount')} placeholder="0,00" min="0" step="0.01" inputMode="decimal" />
+      </div>
+
+      {/* Date */}
+      <div>
+        <label className="block text-xs font-semibold text-txt-secondary mb-1.5 uppercase tracking-wide">Tarih</label>
+        <input type="date" value={form.date} onChange={set('date')} />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="block text-xs font-semibold text-txt-secondary mb-1.5 uppercase tracking-wide">Açıklama</label>
+        <input value={form.desc} onChange={set('desc')} placeholder="Ne için?" />
+      </div>
+
+      {/* Note */}
+      <div>
+        <label className="block text-xs font-semibold text-txt-secondary mb-1.5 uppercase tracking-wide">Not</label>
+        <textarea value={form.note} onChange={set('note')} placeholder="Ek notlar, hatırlatmalar..." />
+      </div>
+
+      {/* Image upload */}
+      <div>
+        <label className="block text-xs font-semibold text-txt-secondary mb-1.5 uppercase tracking-wide">Görsel (Opsiyonel)</label>
+        <ImageUploader
+          currentPreview={imagePreview}
+          onImageSelected={(url, name) => { setImagePreview(url); setImageName(name); }}
+          onRemove={() => { setImagePreview(null); setImageName(''); }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3 mt-2">
+        <button type="button" onClick={onCancel}
+          className="flex-1 py-3.5 rounded-xl border border-border-2 text-txt-secondary font-semibold text-sm hover:bg-surface-3 transition-colors">
+          İptal
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={saving}
+          className="flex-[2] py-3.5 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-50"
+          style={{background:'linear-gradient(135deg,#38bdf8,#7c3aed)'}}>
+          {saving ? '⏳ Kaydediliyor...' : (initial?.id ? '✏️ Güncelle' : '💾 Kaydet')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: RecordCard — single transaction item
+════════════════════════════════════════════════════════ */
+function RecordCard({ record, images, onClick, style }) {
+  const isAlacak = record.type === 'alacak';
+  const hasImg   = images && images.length > 0;
+
+  return (
+    <div onClick={onClick} style={style}
+      className="bg-surface-3 border border-border rounded-xl2 p-4 flex items-center gap-3 cursor-pointer hover:border-border-2 active:scale-[.99] transition-all anim-fadeup">
+      {/* Avatar */}
+      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm border-2 ${
+        isAlacak ? 'bg-emerald-dark border-emerald-border text-emerald' : 'bg-rose-dark border-rose-border text-rose'
+      }`}>
+        {fmt.initials(record.person)}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-txt-primary text-sm truncate">{record.person}</span>
+          {hasImg && <span className="text-xs text-sky" title="Görsel var">📎</span>}
+        </div>
+        <p className="text-txt-secondary text-xs mt-0.5 truncate">{record.desc || (isAlacak ? 'Alacak' : 'Borç')}</p>
+        <p className="text-txt-muted text-xs mt-0.5">{fmt.date(record.date)}</p>
+      </div>
+
+      {/* Amount */}
+      <div className="text-right flex-shrink-0">
+        <div className={`text-base font-bold font-mono ${isAlacak ? 'text-emerald' : 'text-rose'}`}>
+          ₺{fmt.number(record.amount)}
+        </div>
+        <div className={`text-xs mt-0.5 px-2 py-0.5 rounded-full ${
+          isAlacak ? 'bg-emerald-dark text-emerald' : 'bg-rose-dark text-rose'
+        }`}>
+          {isAlacak ? 'Alacak' : 'Borç'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: DetailModal — full record detail with edit/delete
+════════════════════════════════════════════════════════ */
+function DetailModal({ record, images, open, onClose, onEdit, onDelete, onImageClick }) {
+  if (!record) return null;
+  const isAlacak = record.type === 'alacak';
+
+  return (
+    <Modal open={open} onClose={onClose} title={isAlacak ? '💚 Alacak Detayı' : '❤️ Borç Detayı'}>
+      {/* Amount hero */}
+      <div className={`rounded-xl2 p-5 mb-5 text-center border ${
+        isAlacak ? 'bg-emerald-dark border-emerald-border' : 'bg-rose-dark border-rose-border'
+      }`}>
+        <div className={`text-4xl font-black font-mono ${isAlacak ? 'text-emerald' : 'text-rose'}`}>
+          ₺{fmt.number(record.amount)}
+        </div>
+        <div className="text-txt-primary font-bold text-xl mt-2">{record.person}</div>
+        <div className={`inline-block mt-2 text-xs px-3 py-1 rounded-full font-semibold ${
+          isAlacak ? 'bg-emerald text-black' : 'bg-rose text-white'
+        }`}>
+          {isAlacak ? 'ALACAK' : 'BORÇ'}
+        </div>
+      </div>
+
+      {/* Images for this record */}
+      {images && images.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide mb-2">📎 Görseller</p>
+          <div className="grid grid-cols-3 gap-2">
+            {images.map(img => (
+              <img key={img.id} src={img.dataUrl} alt="Kayıt görseli"
+                className="gallery-thumb"
+                onClick={() => onImageClick(img.dataUrl)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Details grid */}
+      <div className="bg-surface-3 rounded-xl border border-border divide-y divide-border mb-5">
+        {[
+          { k: 'Tarih',      v: fmt.date(record.date) },
+          record.desc && { k: 'Açıklama', v: record.desc },
+          record.note && { k: 'Not',      v: record.note },
+          { k: 'Kayıt Tarihi', v: fmt.date(record.createdAt) },
+        ].filter(Boolean).map(({ k, v }) => (
+          <div key={k} className="flex justify-between items-start px-4 py-3 gap-4">
+            <span className="text-txt-muted text-sm flex-shrink-0">{k}</span>
+            <span className="text-txt-primary text-sm font-medium text-right">{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Action buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={onEdit}
+          className="py-3.5 rounded-xl border border-sky-border bg-sky-dark text-sky font-bold text-sm hover:bg-sky/10 transition-colors">
+          ✏️ Düzenle
+        </button>
+        <button onClick={onDelete}
+          className="py-3.5 rounded-xl border border-rose-border bg-rose-dark text-rose font-bold text-sm hover:bg-rose/10 transition-colors">
+          🗑️ Sil
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: SummaryCards — dashboard top stats
+════════════════════════════════════════════════════════ */
+function SummaryCards({ records }) {
+  const alacak = useMemo(() => records.filter(r => r.type==='alacak').reduce((s,r)=>s+r.amount, 0), [records]);
+  const borc   = useMemo(() => records.filter(r => r.type==='borc'  ).reduce((s,r)=>s+r.amount, 0), [records]);
+  const net    = alacak - borc;
+
+  const cards = [
+    { label:'Toplam Alacak', value:`₺${fmt.number(alacak)}`, sub:`${records.filter(r=>r.type==='alacak').length} kayıt`, color:'emerald', cls:'bg-emerald-dark border-emerald-border', txt:'text-emerald', delay:'delay-1' },
+    { label:'Toplam Borç',   value:`₺${fmt.number(borc)}`,   sub:`${records.filter(r=>r.type==='borc').length} kayıt`,   color:'rose',    cls:'bg-rose-dark border-rose-border',     txt:'text-rose',    delay:'delay-2' },
+    { label:'Net Durum',     value:`₺${fmt.number(Math.abs(net))}`, sub: net>=0 ? '↑ Alacak fazlası' : '↓ Borç fazlası',
+      cls: net>=0 ? 'bg-sky-dark border-sky-border' : 'bg-rose-dark border-rose-border',
+      txt: net>=0 ? 'text-sky' : 'text-rose', delay:'delay-3' },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-3 mb-5">
+      {cards.map((c, i) => (
+        <div key={i} className={`${c.cls} ${c.delay} border rounded-xl2 p-4 anim-fadeup ${i===2?'col-span-2':''}`}>
+          <p className="text-xs font-semibold text-txt-muted uppercase tracking-widest mb-2">{c.label}</p>
+          <p className={`text-3xl font-black font-mono ${c.txt} tracking-tight`}>{c.value}</p>
+          <p className="text-txt-muted text-xs mt-1">{c.sub}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: FilterPills — type filter row
+════════════════════════════════════════════════════════ */
+function FilterPills({ value, onChange }) {
+  const options = [
+    { v:'all',    label:'Tümü'     },
+    { v:'alacak', label:'Alacaklar' },
+    { v:'borc',   label:'Borçlar'  },
+  ];
+  return (
+    <div className="flex gap-2 flex-wrap mb-4">
+      {options.map(o => {
+        let cls = 'bg-surface-3 border-border text-txt-secondary hover:border-border-2';
+        if (value === o.v) {
+          if (o.v === 'alacak') cls = 'bg-emerald text-black border-emerald';
+          else if (o.v === 'borc') cls = 'bg-rose text-white border-rose';
+          else cls = 'bg-sky border-sky text-black';
+        }
+        return (
+          <button key={o.v} onClick={() => onChange(o.v)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${cls}`}>
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PAGE: Dashboard — özet + recent records
+════════════════════════════════════════════════════════ */
+function PageDashboard({ records, imageMap, onSelect, onAdd }) {
+  const [filter, setFilter] = useState('all');
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return records;
+    return records.filter(r => r.type === filter);
+  }, [records, filter]);
+
+  return (
+    <div className="safe-bottom px-4 pt-4">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-black font-display text-txt-primary">Özgür Çocuk</h1>
+          <p className="text-txt-muted text-xs mt-0.5">Borç & Alacak Takip</p>
+        </div>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+          style={{background:'linear-gradient(135deg,#38bdf8,#7c3aed)'}}>💰</div>
+      </div>
+
+      <SummaryCards records={records} />
+
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-bold text-txt-primary">Son Kayıtlar</h2>
+        <span className="text-xs text-txt-muted bg-surface-3 border border-border px-2.5 py-1 rounded-full">
+          {filtered.length} kayıt
+        </span>
+      </div>
+
+      <FilterPills value={filter} onChange={setFilter} />
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 anim-fadein">
+          <div className="text-5xl mb-4">📋</div>
+          <p className="text-txt-secondary font-semibold mb-1">Henüz kayıt yok</p>
+          <p className="text-txt-muted text-sm">+ butonuna basarak ekle</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtered.slice(0, 30).map((r, i) => (
+            <RecordCard key={r.id} record={r} images={imageMap[r.id]} onClick={() => onSelect(r)}
+              style={{ animationDelay: `${i * 0.03}s` }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PAGE: Transactions — full list with search
+════════════════════════════════════════════════════════ */
+function PageTransactions({ records, imageMap, onSelect }) {
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    let list = records;
+    if (filter !== 'all') list = list.filter(r => r.type === filter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(r =>
+        r.person.toLowerCase().includes(q) ||
+        (r.desc||'').toLowerCase().includes(q) ||
+        (r.note||'').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [records, filter, search]);
+
+  return (
+    <div className="safe-bottom px-4 pt-4">
+      <h2 className="text-xl font-black font-display text-txt-primary mb-4">Tüm Kayıtlar</h2>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-txt-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Kişi, açıklama veya not ara..."
+          style={{ paddingLeft: '2.25rem' }} />
+      </div>
+
+      <FilterPills value={filter} onChange={setFilter} />
+
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs text-txt-muted">{filtered.length} sonuç</span>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-4xl mb-3">🔍</div>
+          <p className="text-txt-secondary">Sonuç bulunamadı</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtered.map((r, i) => (
+            <RecordCard key={r.id} record={r} images={imageMap[r.id]} onClick={() => onSelect(r)}
+              style={{ animationDelay: `${i * 0.025}s` }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PAGE: Gallery — all images stored in DB
+════════════════════════════════════════════════════════ */
+function PageGallery({ images, records, onImageClick }) {
+  const recordMap = useMemo(() => {
+    const m = {};
+    records.forEach(r => { m[r.id] = r; });
+    return m;
+  }, [records]);
+
+  return (
+    <div className="safe-bottom px-4 pt-4">
+      <h2 className="text-xl font-black font-display text-txt-primary mb-1">Görsel Galerisi</h2>
+      <p className="text-txt-muted text-xs mb-5">Kayıtlara eklenen tüm görseller</p>
+
+      {images.length === 0 ? (
+        <div className="text-center py-20">
+          <div className="text-5xl mb-4">🖼️</div>
+          <p className="text-txt-secondary font-semibold mb-1">Henüz görsel yok</p>
+          <p className="text-txt-muted text-sm">Kayıt eklerken görsel yükleyebilirsin</p>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-txt-muted mb-3">{images.length} görsel</p>
+          <div className="gallery-grid">
+            {images.map((img, i) => {
+              const rec = recordMap[img.recordId];
+              return (
+                <div key={img.id} className="relative anim-fadeup" style={{ animationDelay: `${i*0.03}s` }}>
+                  <img src={img.dataUrl} alt="Galeri görseli" className="gallery-thumb"
+                    onClick={() => onImageClick(img.dataUrl)} />
+                  {rec && (
+                    <div className={`absolute bottom-0 left-0 right-0 text-center text-xs py-0.5 font-semibold rounded-b-lg truncate px-1 ${
+                      rec.type==='alacak' ? 'bg-emerald-dark text-emerald' : 'bg-rose-dark text-rose'
+                    }`}>
+                      {rec.person}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PAGE: Analytics — charts & stats
+════════════════════════════════════════════════════════ */
+function PageAnalytics({ records }) {
+  const pieRef = useRef(); const barRef = useRef(); const personRef = useRef();
+  const [period, setPeriod] = useState('all');
+  const charts = useRef({});
+
+  const filtered = useMemo(() => {
+    if (period === 'all') return records;
+    const now = new Date();
+    const from = new Date(now);
+    if (period === 'week')  from.setDate(from.getDate() - 7);
+    if (period === 'month') from.setMonth(from.getMonth() - 1);
+    return records.filter(r => new Date(r.date) >= from);
+  }, [records, period]);
+
+  const alacak = useMemo(() => filtered.filter(r=>r.type==='alacak').reduce((s,r)=>s+r.amount,0), [filtered]);
+  const borc   = useMemo(() => filtered.filter(r=>r.type==='borc'  ).reduce((s,r)=>s+r.amount,0), [filtered]);
+  const net    = alacak - borc;
+
+  useEffect(() => {
+    // Destroy existing charts
+    Object.values(charts.current).forEach(c => c?.destroy());
+    charts.current = {};
+
+    if (!pieRef.current || !barRef.current || !personRef.current) return;
+
+    // Pie chart
+    charts.current.pie = new Chart(pieRef.current, {
+      type: 'doughnut',
+      data: {
+        labels: ['Alacak', 'Borç'],
+        datasets: [{ data: [alacak || 0.001, borc || 0.001], backgroundColor: ['#10b981','#f43f5e'], borderColor: ['#064e3b','#4c0519'], borderWidth: 2 }]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, cutout:'62%' }
+    });
+
+    // Monthly bar chart
+    const months = {};
+    records.forEach(r => {
+      const m = (r.date||'').slice(0,7) || 'bilinmiyor';
+      if (!months[m]) months[m] = { alacak:0, borc:0 };
+      months[m][r.type] += r.amount;
+    });
+    const keys = Object.keys(months).sort().slice(-8);
+    const TR_M = ['','Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+    const labels = keys.map(m => { const [,mo]=m.split('-'); return TR_M[parseInt(mo)]||m; });
+
+    charts.current.bar = new Chart(barRef.current, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label:'Alacak', data: keys.map(m=>months[m].alacak), backgroundColor:'#10b98188', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
+          { label:'Borç',   data: keys.map(m=>months[m].borc),   backgroundColor:'#f43f5e88', borderColor:'#f43f5e', borderWidth:1, borderRadius:4 }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales: {
+          x: { ticks:{color:'#3d5166', font:{size:11}}, grid:{color:'#1e2d4a'} },
+          y: { ticks:{color:'#3d5166', callback:v=>'₺'+fmt.number(v), font:{size:10}}, grid:{color:'#1e2d4a'} }
+        }
+      }
+    });
+
+    // Person horizontal bar
+    const persons = {};
+    filtered.forEach(r => {
+      if(!persons[r.person]) persons[r.person]={alacak:0,borc:0};
+      persons[r.person][r.type]+=r.amount;
+    });
+    const top = Object.entries(persons).sort((a,b)=>(b[1].alacak+b[1].borc)-(a[1].alacak+a[1].borc)).slice(0,7);
+    const pH = Math.max(top.length*46+80, 180);
+    personRef.current.parentElement.style.height = pH + 'px';
+
+    charts.current.person = new Chart(personRef.current, {
+      type: 'bar',
+      data: {
+        labels: top.map(p=>p[0]),
+        datasets: [
+          { label:'Alacak', data:top.map(p=>p[1].alacak), backgroundColor:'#10b98188', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
+          { label:'Borç',   data:top.map(p=>p[1].borc),   backgroundColor:'#f43f5e88', borderColor:'#f43f5e', borderWidth:1, borderRadius:4 }
+        ]
+      },
+      options: {
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales: {
+          x: { ticks:{color:'#3d5166', callback:v=>'₺'+fmt.number(v), font:{size:10}}, grid:{color:'#1e2d4a'} },
+          y: { ticks:{color:'#7a8fa8', autoSkip:false, font:{size:11}} }
+        }
+      }
+    });
+  }, [filtered, alacak, borc, records]);
+
+  return (
+    <div className="safe-bottom px-4 pt-4">
+      <h2 className="text-xl font-black font-display text-txt-primary mb-4">Analiz & Raporlar</h2>
+
+      {/* Period filter */}
+      <div className="flex gap-2 mb-5">
+        {[['all','Tümü'],['week','Bu Hafta'],['month','Bu Ay']].map(([v,l]) => (
+          <button key={v} onClick={() => setPeriod(v)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+              period===v ? 'bg-sky border-sky text-black' : 'bg-surface-3 border-border text-txt-secondary'
+            }`}>{l}</button>
+        ))}
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {[
+          { l:'Alacak', v:`₺${fmt.number(alacak)}`, cls:'text-emerald' },
+          { l:'Borç',   v:`₺${fmt.number(borc)}`,   cls:'text-rose'    },
+          { l:'Net',    v:`₺${fmt.number(Math.abs(net))}`, cls: net>=0?'text-sky':'text-rose' },
+          { l:'Kayıt',  v:filtered.length, cls:'text-violet' },
+        ].map((s,i) => (
+          <div key={i} className="bg-surface-3 border border-border rounded-xl p-3 text-center">
+            <div className={`text-xl font-black font-mono ${s.cls}`}>{s.v}</div>
+            <div className="text-xs text-txt-muted mt-1 uppercase tracking-wide">{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="bg-surface-3 border border-border rounded-xl2 p-4 mb-4">
+        <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide mb-3">Dağılım</p>
+        <div className="flex gap-3 text-xs text-txt-secondary mb-2">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald inline-block"></span>Alacak</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose inline-block"></span>Borç</span>
+        </div>
+        <div style={{height:'220px', position:'relative'}}>
+          <canvas ref={pieRef}></canvas>
+        </div>
+      </div>
+
+      <div className="bg-surface-3 border border-border rounded-xl2 p-4 mb-4">
+        <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide mb-3">Aylık Para Akışı</p>
+        <div style={{height:'200px', position:'relative'}}>
+          <canvas ref={barRef}></canvas>
+        </div>
+      </div>
+
+      <div className="bg-surface-3 border border-border rounded-xl2 p-4">
+        <p className="text-xs font-semibold text-txt-secondary uppercase tracking-wide mb-3">Kişi Bazlı</p>
+        <div style={{position:'relative'}}>
+          <canvas ref={personRef}></canvas>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PAGE: Settings — export / import / clear / PWA
+════════════════════════════════════════════════════════ */
+function PageSettings({ records, images, showToast, onDataChanged, onClearRequest }) {
+  const [deferredPWA, setDeferredPWA] = useState(null);
+  const importRef = useRef();
+
+  useEffect(() => {
+    const handler = e => { e.preventDefault(); setDeferredPWA(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const exportJSON = async () => {
+    try {
+      const data = await DB.exportJSON();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      downloadBlob(blob, `ozgur-cocuk-yedek-${fmt.today()}.json`);
+      showToast('📦 JSON yedek indirildi!');
+    } catch(e) { showToast('Dışa aktarma hatası: ' + e.message, 'error'); }
+  };
+
+  const importJSON = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    importRef.current.value = '';
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      // Not: window.confirm() bazı ortamlarda çalışmayabilir.
+      // Küçük kayıt sayılarında direkt import ediyoruz (kullanıcı zaten JSON seçti).
+      const n = (data.records||[]).length;
+      if (n === 0) throw new Error('Yedek dosyası boş');
+      const added = await DB.importJSON(data);
+      await onDataChanged();
+      showToast(`✅ ${added} yeni kayıt içe aktarıldı!`);
+    } catch(e) { showToast('İçe aktarma hatası: ' + e.message, 'error'); }
+  };
+
+  const exportExcel = () => {
+    if (!records.length) { showToast('Dışa aktarılacak kayıt yok!', 'error'); return; }
+    const rows = records.map(r => ({
+      'Tarih':       fmt.date(r.date),
+      'Kişi':        r.person,
+      'Tür':         r.type === 'alacak' ? 'Alacak' : 'Borç',
+      'Tutar (₺)':   r.amount,
+      'Açıklama':    r.desc || '',
+      'Not':         r.note || '',
+      'Kayıt Tarihi': fmt.date(r.createdAt),
+    }));
+    const alacakToplam = records.filter(r=>r.type==='alacak').reduce((s,r)=>s+r.amount,0);
+    const borcToplam   = records.filter(r=>r.type==='borc').reduce((s,r)=>s+r.amount,0);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:14},{wch:22},{wch:10},{wch:12},{wch:28},{wch:28},{wch:16}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Kayıtlar');
+    const ws2 = XLSX.utils.aoa_to_sheet([
+      ['Özgür Çocuk — Özet'],
+      ['Tarih', new Date().toLocaleDateString('tr-TR')],
+      [],
+      ['Toplam Alacak', alacakToplam],
+      ['Toplam Borç', borcToplam],
+      ['Net Durum', alacakToplam - borcToplam],
+      ['Toplam Kayıt', records.length],
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Özet');
+    XLSX.writeFile(wb, `ozgur-cocuk-${fmt.today()}.xlsx`);
+    showToast('📊 Excel dosyası indirildi!');
+  };
+
+  const shareWhatsApp = () => {
+    const alacak = records.filter(r=>r.type==='alacak').reduce((s,r)=>s+r.amount,0);
+    const borc   = records.filter(r=>r.type==='borc').reduce((s,r)=>s+r.amount,0);
+    const net    = alacak - borc;
+    const msg = [
+      '💰 *Özgür Çocuk — Borç Özeti*',
+      '📅 ' + new Date().toLocaleDateString('tr-TR'),
+      '',
+      '💚 Toplam Alacak: ₺' + fmt.number(alacak),
+      '❤️ Toplam Borç:   ₺' + fmt.number(borc),
+      (net>=0?'📈':'📉') + ' Net Durum: ₺' + fmt.number(Math.abs(net)) + (net>=0?' (Alacak)':' (Borç)'),
+      '',
+      '📋 Toplam ' + records.length + ' kayıt',
+    ].join('\n');
+    window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  };
+
+  // clearAll artık window.confirm kullanmıyor.
+  // Üst bileşenden gelen onClearRequest callback'i onay diyaloğunu açar.
+  const clearAll = () => { onClearRequest(); };
+
+  const installPWA = () => {
+    if (deferredPWA) {
+      deferredPWA.prompt();
+      deferredPWA.userChoice.then(r => {
+        if (r.outcome === 'accepted') showToast('✅ Uygulama yükleniyor!');
+        setDeferredPWA(null);
+      });
+    } else {
+      showToast('Tarayıcı: Menü → "Ana Ekrana Ekle" / "Yükle"', 'info', 4500);
+    }
+  };
+
+  const SettingItem = ({ icon, iconBg, title, sub, onClick, danger }) => (
+    <div onClick={onClick} role="button" tabIndex={0}
+      onKeyDown={e => (e.key==='Enter'||e.key===' ') && onClick()}
+      className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-surface-4 transition-colors ${danger?'hover:bg-rose-dark':''}`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base ${iconBg}`}>{icon}</div>
+        <div>
+          <div className={`font-semibold text-sm ${danger?'text-rose':'text-txt-primary'}`}>{title}</div>
+          {sub && <div className="text-xs text-txt-muted mt-0.5">{sub}</div>}
+        </div>
+      </div>
+      <svg className="w-4 h-4 text-txt-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </div>
+  );
+
+  return (
+    <div className="safe-bottom px-4 pt-4">
+      <h2 className="text-xl font-black font-display text-txt-primary mb-5">Ayarlar</h2>
+
+      {/* Data management */}
+      <p className="text-xs font-semibold text-txt-muted uppercase tracking-widest mb-2 px-1">Veri Yönetimi</p>
+      <div className="bg-surface-3 border border-border rounded-xl2 overflow-hidden mb-5 divide-y divide-border">
+        <SettingItem icon="📦" iconBg="bg-sky-dark" title="JSON Dışa Aktar" sub="Tüm kayıtları yedekle" onClick={exportJSON} />
+        <SettingItem icon="📥" iconBg="bg-emerald-dark" title="JSON İçe Aktar" sub="Yedekten geri yükle" onClick={() => importRef.current?.click()} />
+        <SettingItem icon="📊" iconBg="bg-amber-dark" title="Excel'e Aktar (.xlsx)" sub="İşlemler + özet sayfası" onClick={exportExcel} />
+        <SettingItem icon="💬" iconBg="bg-emerald-dark" title="WhatsApp ile Paylaş" sub="Özet mesaj olarak gönder" onClick={shareWhatsApp} />
+        <SettingItem icon="🗑️" iconBg="bg-rose-dark" title="Tüm Verileri Sil" sub="Geri alınamaz!" onClick={clearAll} danger />
+      </div>
+      <input ref={importRef} type="file" accept=".json" onChange={importJSON} style={{display:'none'}} />
+
+      {/* App */}
+      <p className="text-xs font-semibold text-txt-muted uppercase tracking-widest mb-2 px-1">Uygulama</p>
+      <div className="bg-surface-3 border border-border rounded-xl2 overflow-hidden mb-5 divide-y divide-border">
+        <SettingItem icon="📲" iconBg="bg-violet-dark" title="Uygulamayı Yükle (PWA)" sub="Ana ekrana ekle — offline çalışır" onClick={installPWA} />
+      </div>
+
+      {/* Info */}
+      <div className="bg-surface-3 border border-border rounded-xl2 p-4 text-center">
+        <div className="text-2xl mb-2">💰</div>
+        <div className="font-bold text-txt-primary font-display">Özgür Çocuk</div>
+        <div className="text-xs text-txt-muted mt-1">v2.0 · React + Dexie (IndexedDB)</div>
+        <div className="text-xs text-txt-muted mt-0.5">
+          {records.length} kayıt · {images.length} görsel
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: BottomNav — mobile tab bar
+════════════════════════════════════════════════════════ */
+function BottomNav({ page, onChange }) {
+  const tabs = [
+    { id:'dashboard',    label:'Özet',    icon:<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>, icon2:<polyline points="9 22 9 12 15 12 15 22"/> },
+    { id:'transactions', label:'Kayıtlar', icon:<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>, icon2:<><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></> },
+    { id:'gallery',      label:'Galeri',  icon:<><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></> },
+    { id:'analytics',    label:'Analiz',  icon:<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></> },
+    { id:'settings',     label:'Ayarlar', icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></> },
+  ];
+
+  return (
+    <nav className="mobile-only fixed bottom-0 left-0 right-0 bg-surface-2 border-t border-border bottom-nav flex z-50">
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors ${page===t.id?'tab-active text-sky':'text-txt-muted'}`}>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            {t.icon}{t.icon2}
+          </svg>
+          <span className="text-[10px] font-semibold">{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: DesktopNav — sidebar for wide screens
+════════════════════════════════════════════════════════ */
+function DesktopNav({ page, onChange }) {
+  const items = [
+    { id:'dashboard',    label:'Özet',     emoji:'🏠' },
+    { id:'transactions', label:'Kayıtlar', emoji:'📋' },
+    { id:'gallery',      label:'Galeri',   emoji:'🖼️' },
+    { id:'analytics',    label:'Analiz',   emoji:'📊' },
+    { id:'settings',     label:'Ayarlar',  emoji:'⚙️' },
+  ];
+  return (
+    <aside className="desktop-show fixed left-0 top-0 bottom-0 w-56 bg-surface-2 border-r border-border flex-col z-50 pt-6 px-3">
+      <div className="px-2 mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+            style={{background:'linear-gradient(135deg,#38bdf8,#7c3aed)'}}>💰</div>
+          <div>
+            <div className="font-black text-sm font-display text-txt-primary">Özgür Çocuk</div>
+            <div className="text-xs text-txt-muted">Borç Takip</div>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        {items.map(item => (
+          <button key={item.id} onClick={() => onChange(item.id)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              page===item.id ? 'bg-sky-dark text-sky border border-sky-border' : 'text-txt-secondary hover:bg-surface-3 hover:text-txt-primary'
+            }`}>
+            <span>{item.emoji}</span>
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: ImageLightbox — fullscreen image view
+════════════════════════════════════════════════════════ */
+function ImageLightbox({ src, onClose }) {
+  if (!src) return null;
+  return (
+    <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-4 anim-fadein"
+      onClick={onClose}>
+      <button onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-surface-3 border border-border flex items-center justify-center text-txt-primary">
+        ✕
+      </button>
+      <img src={src} alt="Tam ekran görsel" className="max-w-full max-h-full rounded-xl object-contain"
+        onClick={e => e.stopPropagation()} />
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   COMPONENT: ConfirmDialog — window.confirm() yerine
+   React tabanlı onay diyalogu. WhatsApp WebView'da
+   window.confirm() çalışmadığı için bu gerekli.
+════════════════════════════════════════════════════════ */
+function ConfirmDialog({ dlg, onNo }) {
+  if (!dlg) return null;
+  return (
+    <div style={{
+      position:'fixed', inset:0, background:'rgba(0,0,0,.82)',
+      backdropFilter:'blur(6px)', zIndex:500,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'
+    }}>
+      <div style={{
+        background:'#111827', border:'1px solid #1e2d4a',
+        borderRadius:'1.25rem', padding:'24px 20px',
+        maxWidth:'360px', width:'100%'
+      }}>
+        <div style={{ fontSize:'32px', marginBottom:'14px', textAlign:'center' }}>⚠️</div>
+        <p style={{
+          color:'#e2e8f4', fontSize:'15px', lineHeight:1.65,
+          marginBottom:'22px', textAlign:'center', whiteSpace:'pre-line'
+        }}>{dlg.msg}</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
+          <button onClick={onNo} style={{
+            padding:'13px', borderRadius:'10px', border:'1px solid #1e2d4a',
+            background:'#1a2235', color:'#7a8fa8',
+            fontWeight:600, fontSize:'14px', cursor:'pointer', fontFamily:'inherit'
+          }}>İptal</button>
+          <button onClick={dlg.onYes} style={{
+            padding:'13px', borderRadius:'10px',
+            border:'1px solid #881337', background:'rgba(244,63,94,.15)',
+            color:'#f43f5e', fontWeight:700, fontSize:'14px',
+            cursor:'pointer', fontFamily:'inherit'
+          }}>Evet, Sil</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   ROOT COMPONENT: App
+════════════════════════════════════════════════════════ */
+function App() {
+  const { toast, show: showToast } = useToast();
+
+  // ── App state ───────────────────────────────────────────
+  const [page,        setPage]        = useState('dashboard');
+  const [records,     setRecords]     = useState([]);
+  const [imageMap,    setImageMap]    = useState({}); // { recordId: [imageObj, ...] }
+  const [allImages,   setAllImages]   = useState([]);
+  const [loading,     setLoading]     = useState(true);
+
+  // Modal states
+  const [addOpen,     setAddOpen]     = useState(false);
+  const [editRecord,  setEditRecord]  = useState(null);  // record being edited
+  const [detailRec,   setDetailRec]   = useState(null);  // record shown in detail modal
+  const [detailOpen,  setDetailOpen]  = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  // Onay diyalogu — window.confirm() yerine React modal kullanıyoruz.
+  // WhatsApp WebView ve iframe'lerde window.confirm() çalışmaz/bloke olur.
+  const [confirmDlg,  setConfirmDlg]  = useState(null); // { msg, onYes }
+
+  // ── Load data from IndexedDB ─────────────────────────────
+  const loadData = useCallback(async () => {
+    const [recs, imgs] = await Promise.all([DB.getAllRecords(), DB.getAllImages()]);
+    setRecords(recs);
+    setAllImages(imgs);
+    // Build imageMap: { recordId -> [imgs] }
+    const m = {};
+    imgs.forEach(img => {
+      if (!m[img.recordId]) m[img.recordId] = [];
+      m[img.recordId].push(img);
+    });
+    setImageMap(m);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Seed demo data — SADECE ilk açılışta, bir kez ────────
+  // localStorage bayrağı sayesinde kullanıcı silse bile
+  // demo veriler bir daha geri gelmez.
+  useEffect(() => {
+    if (loading) return;
+    const SEED_KEY = 'ozgur_cocuk_seeded_v1';
+    if (localStorage.getItem(SEED_KEY)) return;   // daha önce seed yapıldıysa dur
+    localStorage.setItem(SEED_KEY, '1');           // bayrağı hemen set et
+    (async () => {
+      const demo = [
+        { type:'alacak', person:'Ahmet Yılmaz', amount:1500, date:'2026-04-28', desc:'Kira borcu',       note:'Mayıs sonu ödenecek' },
+        { type:'borc',   person:'Mehmet Kaya',  amount:750,  date:'2026-05-02', desc:'Market',           note:''                   },
+        { type:'alacak', person:'Ayşe Demir',   amount:3200, date:'2026-05-05', desc:'Fatura',           note:'Elektrik + su'      },
+        { type:'borc',   person:'Fatma Şahin',  amount:500,  date:'2026-04-15', desc:'Araba tamiri',     note:''                   },
+        { type:'alacak', person:'Ali Öztürk',   amount:2800, date:'2026-03-20', desc:'İş ortaklığı',     note:'3 ay önce verildi'  },
+      ];
+      for (const d of demo) await DB.addRecord(d);
+      await loadData();
+    })();
+  }, [loading, loadData]); // records.length BAĞIMLILIĞI KALDIRILDI — kritik düzeltme
+
+  // ── Save new record ──────────────────────────────────────
+  const handleSaveNew = useCallback(async (formData, imagePreview, imageName) => {
+    const id = await DB.addRecord(formData);
+    if (imagePreview) await DB.addImage(id, imagePreview, imageName || 'görsel');
+    await loadData();
+    setAddOpen(false);
+  }, [loadData]);
+
+  // ── Save edited record ───────────────────────────────────
+  const handleSaveEdit = useCallback(async (formData, imagePreview, imageName) => {
+    const id = editRecord.id;
+    await DB.updateRecord(id, formData);
+    // If new image was added
+    if (imagePreview && !imagePreview.startsWith('existing:')) {
+      // Remove old images for this record? Or keep — for now: keep existing, add new
+      await DB.addImage(id, imagePreview, imageName || 'görsel');
+    }
+    await loadData();
+    setEditRecord(null);
+    setDetailOpen(false);
+  }, [editRecord, loadData]);
+
+  // ── Delete record ────────────────────────────────────────
+  // window.confirm() yerine kendi React diyaloğumuzu açıyoruz.
+  const handleDelete = useCallback(() => {
+    if (!detailRec) return;
+    setConfirmDlg({
+      msg: `"${detailRec.person}" kaydı kalıcı olarak silinsin mi?`,
+      onYes: async () => {
+        const id = detailRec.id;
+        setConfirmDlg(null);
+        setDetailOpen(false);
+        setDetailRec(null);
+        await DB.deleteRecord(id);
+        await loadData();
+        showToast('🗑️ Kayıt silindi', 'error');
+      },
+    });
+  }, [detailRec, loadData, showToast]);
+
+  // ── Tümünü sil — React diyalogu ile onay al ─────────────
+  const handleClearAll = useCallback(() => {
+    setConfirmDlg({
+      msg: 'TÜM kayıtlar ve görseller kalıcı olarak silinecek!\nBu işlem geri alınamaz.',
+      onYes: async () => {
+        setConfirmDlg(null);
+        await db.records.clear();
+        await db.images.clear();
+        // Seed bayrağını da sıfırla ki uygulama temiz başlasın
+        localStorage.removeItem('ozgur_cocuk_seeded_v1');
+        await loadData();
+        showToast('🗑️ Tüm veriler silindi', 'error');
+      },
+    });
+  }, [loadData, showToast]);
+
+  // ── Open detail ──────────────────────────────────────────
+  const handleSelect = useCallback(rec => {
+    setDetailRec(rec);
+    setDetailOpen(true);
+  }, []);
+
+  // ── Open edit from detail ────────────────────────────────
+  const handleEditFromDetail = useCallback(() => {
+    setDetailOpen(false);
+    setEditRecord(detailRec);
+  }, [detailRec]);
+
+  const [hasDesktop, setHasDesktop] = useState(window.innerWidth >= 768);
+  useEffect(() => {
+    const onResize = () => setHasDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-sky border-t-transparent spinner mx-auto mb-4"></div>
+          <p className="text-txt-muted text-sm">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`min-h-screen bg-surface ${hasDesktop ? 'pl-56' : ''}`}>
+      {/* Desktop sidebar */}
+      <DesktopNav page={page} onChange={setPage} />
+
+      {/* Toast notification */}
+      <Toast toast={toast} />
+
+      {/* Lightbox */}
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+
+      {/* ── Pages ── */}
+      {page === 'dashboard'    && <PageDashboard    records={records} imageMap={imageMap} onSelect={handleSelect} onAdd={() => setAddOpen(true)} />}
+      {page === 'transactions' && <PageTransactions records={records} imageMap={imageMap} onSelect={handleSelect} />}
+      {page === 'gallery'      && <PageGallery      images={allImages} records={records} onImageClick={setLightboxSrc} />}
+      {page === 'analytics'    && <PageAnalytics    records={records} />}
+      {page === 'settings'     && <PageSettings     records={records} images={allImages} showToast={showToast} onDataChanged={loadData} onClearRequest={handleClearAll} />}
+
+      {/* ── FAB: Add new ── */}
+      <button className="fab" onClick={() => setAddOpen(true)} aria-label="Yeni kayıt ekle">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+
+      {/* ── Modal: Add ── */}
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Yeni Kayıt Ekle">
+        <RecordForm onSave={handleSaveNew} onCancel={() => setAddOpen(false)} showToast={showToast} />
+      </Modal>
+
+      {/* ── Modal: Edit ── */}
+      <Modal open={!!editRecord} onClose={() => setEditRecord(null)} title="Kaydı Düzenle">
+        {editRecord && (
+          <RecordForm
+            initial={editRecord}
+            onSave={handleSaveEdit}
+            onCancel={() => setEditRecord(null)}
+            showToast={showToast}
+          />
+        )}
+      </Modal>
+
+      {/* ── Modal: Detail ── */}
+      <DetailModal
+        record={detailRec}
+        images={detailRec ? (imageMap[detailRec.id] || []) : []}
+        open={detailOpen}
+        onClose={() => { setDetailOpen(false); setDetailRec(null); }}
+        onEdit={handleEditFromDetail}
+        onDelete={handleDelete}
+        onImageClick={setLightboxSrc}
+      />
+
+      {/* ── Onay diyalogu (silme işlemleri için) ── */}
+      <ConfirmDialog dlg={confirmDlg} onNo={() => setConfirmDlg(null)} />
+
+      {/* ── Mobile bottom nav ── */}
+      <BottomNav page={page} onChange={setPage} />
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   SERVICE WORKER — offline support (registered inline)
+════════════════════════════════════════════════════════ */
+// Service Worker kaydı — blob URL yerine güvenli try-catch ile
+if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
+  try {
+    const SW_CODE = `
+const CACHE = 'ozgur-cocuk-v2';
+const URLS = ['./'];
+self.addEventListener('install', e => {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request).catch(()=>cached))
+  );
+});
+`;
+    const swBlob = new Blob([SW_CODE], { type: 'text/javascript' });
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl).catch(() => {});
+  } catch(e) { /* file:// protokolünde service worker desteklenmez */ }
+}
+
+/* ════════════════════════════════════════════════════════
+   BOOTSTRAP — render React app
+════════════════════════════════════════════════════════ */
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
